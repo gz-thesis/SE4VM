@@ -1,0 +1,74 @@
+This is our current project progress report:
+
+We have run KLEE to generate paths for four major functions: "e1000_set_link_status", "e1000_receive", "e1000_mmio_write", and "e1000_mmio_read".
+
+These functions also call the following functions in e1000.c file:
+
+e1000_set_link_status:
+     e1000_link_down
+     e1000_link_up
+     set_ics
+     set_interrupt_cause
+     mit_update_delay
+
+e1000_receive:
+     e1000_receive_iov
+     receive_filter
+     is_vlan_packet
+     vlan_rx_filter_enabled
+     vlan_enabled
+     e1000_has_rxbufs
+     rx_desc_base
+     set_ics
+     set_interrupt_cause
+     
+e1000_mmio_read:
+     macreg_readops
+
+e1000_mmio_write:
+     macreg_writeops
+     macreg_readops
+
+KLEE has completed 10852 paths and generated 10852 tests without errors.
+
+The KLEE output is:
+KLEE: done: total instructions = 2686976
+KLEE: done: completed paths = 10852
+KLEE: done: generated tests = 10852
+
+
+We have fixed the following four major error issues in this project:
+
+ERROR1: pointer out of bound.
+Many of the function parameters are struct, such as "NetClientState", "E1000State", etc. If we just make the struct symbolic, the pointer may point to an invalid address, which could be a pointer out of bound error. Instead, we need to look at the variables inside the struct, make the appropriate variables symbolic, then use memcpy to copy this block of memory into the struct and then pass it to the function. 
+
+For example, we can do the following:
+
+NetClientState ncState;
+int link_down;
+klee_make_symbolic(&link_down, sizeof(link_down), "link_down");
+memcpy(&ncState.link_down, &link_down, sizeof(int));
+e1000_set_link_status(&ncState);
+
+
+ERROR2: external function call error.
+Many of the functions in e1000.c file are calling some functions from other c files, we need to search and find those external functions, and then copy those functions into a separate c file, and included in the main function file as the header file.
+
+
+ERROR3: fork error with stp.
+This is because the KLEE is running of the memory. The default memory is 2000MB, in this case, you need to specify the memory by using this command option "--max-memory".
+
+For example, add this option when use the KLEE command: "--max-memory=8000"
+
+
+ERROR4: segmentation fault after this KLEE warning: "KLEE: WARNING ONCE: flushing 7152 bytes on read, may be slow and/or crash".
+This is because of a stack overflow in the STP solver, when converting a very large symbolic array into its bitvector representation. A solution is that first we need to allow for an unlimited stack size by running "ulimit -s unlimited", and then specify more array size by using this option "--max-sym-array-size" in the KLEE command. In our case, I specify the size to be "--max-sym-array-size=0x8000" since there is a declaration "uint32_t mac_reg[0x8000];" in E1000State struct.
+
+Currently this folder includes the following source files: klee_main.c which is the main function file, klee_external_function_calls.c which is the external function calls, and e1000.c which is the original virtual network card e1000.c file.
+
+Please copy those c files under ./qemu-1.7.1/hw/net/ folder and run the following command under the qemu-1.7.1 root path.
+
+The commands are:
+llvm-gcc --emit-llvm -c -g -I. -Iinclude -Inet -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include hw/net/klee_main.c -o e1000.bc
+
+klee --allow-external-sym-calls --all-external-warnings --max-memory=20000 --max-sym-array-size=0x8000 e1000.bc 

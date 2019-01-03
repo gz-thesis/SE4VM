@@ -1,0 +1,17 @@
+binding
+boxed
+closure
+dynamictests
+enums
+ifaceproperties
+object
+param
+properties
+qdata
+reference
+signals
+threadtests
+type
+valuearray
+private
+marshalers.[ch]

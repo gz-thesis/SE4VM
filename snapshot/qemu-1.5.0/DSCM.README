@@ -1,0 +1,44 @@
+Device State Check for Migration
+================================
+
+Rohit, Kang
+
+
+About
+A tool to check the completeness of device state for live VM migration.
+
+
+Plan
+1. Add a monitor option to enable/disable device state completeness 
+checking.
+
+2. Keep a snapshot of default device state after init
+
+3. Periodically reset device states to the init values except those
+registers set by the VMState structure
+
+4. Detect errors in VM
+
+Acronyms:
+1. Device State Investigator/Inspector (DSI)
+2. Device State Integrity Inspector/Investigator (DSI^2)
+3. Device State Integrity Checker (DSIC)
+
+Questions:
+1. Where is device init invoked for every device? [object.c]
+	 at /home/rohit/Development/qemu-1.5.0/qom/object.c:284
+	 284	        ti->class_init(ti->class, ti->class_data);
+	 (gdb) p *ti
+	 $39 = {name = 0x555556618bf0 "e1000", class_size = 216, 
+	  instance_size = 207408, class_init = 0x5555556f1d6e <e1000_class_init>, 
+	  class_base_init = 0x0, class_finalize = 0x0, class_data = 0x0, 
+	  instance_init = 0x0, instance_finalize = 0x0, abstract = false, 
+	  parent = 0x555556618c10 "pci-device", parent_type = 0x55555661c430, 
+	  class = 0x55555683b210, num_interfaces = 0, interfaces = {{
+	      typename = 0x0} <repeats 32 times>}}
+	ti is of type TypeImpl.
+
+2. QEMU object model for devices. 
+ 	http://wiki.qemu.org/Features/QOM
+
+3. Representation of VMStateDescription structure in memory.
